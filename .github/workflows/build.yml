@@ -1,0 +1,36 @@
+name: Code Build Workflow
+
+on:
+  workflow_run:
+    workflows:
+      - Sonar Code Review Workflow
+    types:
+      - completed
+
+jobs:
+  build:
+    name: Build
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Docker build and push
+        run: |
+          docker build -t eks-react .
+          docker tag eks-react lhowsam/eks-react:latest
+          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
+          docker push lhowsam/eks-react:latest
+        env:
+          DOCKER_CLI_ACI: 1
+
+      - name: Pull the Docker image On AWS EC2 For testing of website
+        run: docker pull sevenajay/tic-tac-toe:latest
+
+      - name: Stop and remove existing container
+        run: |
+          docker stop eks-react || true
+          docker rm eks-react || true
+
+      - name: Run the container on AWS EC2 for testing
+        run: docker run -d --name eks-react -p 3000:3000 lhowsam/eks-react:latest
